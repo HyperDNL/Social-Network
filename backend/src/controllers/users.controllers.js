@@ -9,7 +9,7 @@ import {
   getRefreshToken,
   COOKIE_OPTIONS,
 } from "../helpers/authenticate.js";
-import { JWT_SECRET } from "../config/config.js";
+import { JWT_SECRET, MAX_IMAGE_SIZE } from "../config/config.js";
 import {
   validateStringField,
   validateStringStrictField,
@@ -21,6 +21,11 @@ import {
   validateMobileNumberField,
 } from "../libs/validators.js";
 import { uploadImage, deleteImage } from "../libs/cloudinary.js";
+import {
+  getExtension,
+  isValidImageExtension,
+  getFileSizeInMB,
+} from "../libs/imagesHandling.js";
 
 export const signup = async (req, res) => {
   try {
@@ -217,14 +222,13 @@ export const profile = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { signedCookies = {}, user } = req;
+    const { signedCookies = {}, user, body, files } = req;
     const { refreshToken } = signedCookies;
 
     if (!refreshToken || !user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { files, body } = req;
     const {
       name,
       last_name,
@@ -234,6 +238,7 @@ export const updateProfile = async (req, res) => {
       genre,
       private_profile,
     } = body;
+
     const { _id } = user;
 
     const userProfile = await User.findById(_id);
@@ -302,6 +307,31 @@ export const updateProfile = async (req, res) => {
       });
     }
 
+    let pictureToUpload = null;
+
+    if (files && files.profile_picture) {
+      const { profile_picture } = files;
+
+      const pictureExtension = getExtension(profile_picture.name);
+
+      if (!isValidImageExtension(pictureExtension)) {
+        errors.push({
+          error:
+            "Invalid image type. Only JPG, JPEG, PNG, and WebP images are allowed.",
+        });
+      }
+
+      const pictureSize = getFileSizeInMB(profile_picture.size);
+
+      if (pictureSize > MAX_IMAGE_SIZE) {
+        errors.push({
+          error: `Image size exceeds the maximum allowed (${MAX_IMAGE_SIZE}MB).`,
+        });
+      }
+
+      pictureToUpload = profile_picture.tempFilePath;
+    }
+
     if (errors.length > 0) {
       return res.status(400).json({ errors });
     }
@@ -339,10 +369,8 @@ export const updateProfile = async (req, res) => {
       updateValues.private_profile = private_profile;
     }
 
-    if (files && files.profile_picture) {
+    if (pictureToUpload !== null) {
       try {
-        const { profile_picture } = files;
-
         if (
           userProfile.profile_picture &&
           userProfile.profile_picture.public_id
@@ -350,9 +378,9 @@ export const updateProfile = async (req, res) => {
           await deleteImage(userProfile.profile_picture.public_id);
         }
 
-        const uploadedImage = await uploadImage(profile_picture.tempFilePath);
+        const uploadedImage = await uploadImage(pictureToUpload);
 
-        await fs.remove(profile_picture.tempFilePath);
+        await fs.remove(pictureToUpload);
 
         updateValues.profile_picture = {
           url: uploadedImage.secure_url,
