@@ -3,6 +3,12 @@ import User from "../models/User.js";
 import Post from "../models/Post.js";
 import { validateStringField, validateArrayField } from "../libs/validators.js";
 import { uploadImage, deleteImage } from "../libs/cloudinary.js";
+import {
+  getExtension,
+  isValidImageExtension,
+  getFileSizeInMB,
+} from "../libs/imagesHandling.js";
+import { MAX_IMAGE_SIZE } from "../config/config.js";
 
 export const createPost = async (req, res) => {
   try {
@@ -45,30 +51,69 @@ export const createPost = async (req, res) => {
       });
     }
 
+    const imagesToUpload = [];
+
+    if (files && files.images) {
+      const { images } = files;
+
+      if (validateArrayField(images)) {
+        images.forEach(({ name, size, tempFilePath }) => {
+          const imageExtension = getExtension(name);
+
+          if (!isValidImageExtension(imageExtension)) {
+            errors.push({
+              error: `Invalid image type (${name}). Only JPG, JPEG, PNG, and WebP images are allowed.`,
+            });
+          }
+
+          const imageSize = getFileSizeInMB(size);
+
+          if (imageSize > MAX_IMAGE_SIZE) {
+            errors.push({
+              error: `Image size (${name}) exceeds the maximum allowed (${MAX_IMAGE_SIZE}MB).`,
+            });
+          }
+
+          imagesToUpload.push({ tempFilePath });
+        });
+      } else {
+        const { name, size, tempFilePath } = images;
+
+        const imageExtension = getExtension(name);
+
+        if (!isValidImageExtension(imageExtension)) {
+          errors.push({
+            error: `Invalid image type (${name}). Only JPG, JPEG, PNG, and WebP images are allowed.`,
+          });
+        }
+
+        const imageSize = getFileSizeInMB(size);
+
+        if (imageSize > MAX_IMAGE_SIZE) {
+          errors.push({
+            error: `Image size (${name}) exceeds the maximum allowed (${MAX_IMAGE_SIZE}MB).`,
+          });
+        }
+
+        imagesToUpload.push({ tempFilePath });
+      }
+    }
+
     if (errors.length > 0) {
       return res.status(400).json({ errors });
     }
 
     let imageResults;
 
-    if (files && files.images) {
+    if (imagesToUpload.length > 0) {
       try {
-        const { images } = files;
-
-        if (validateArrayField(images)) {
-          imageResults = await Promise.all(
-            images.map(async ({ tempFilePath }) => {
-              const imageResult = await uploadImage(tempFilePath);
-              await fs.remove(tempFilePath);
-              return imageResult;
-            })
-          );
-        } else {
-          const { tempFilePath } = images;
-          const imageResult = await uploadImage(tempFilePath);
-          await fs.remove(tempFilePath);
-          imageResults = [imageResult];
-        }
+        imageResults = await Promise.all(
+          imagesToUpload.map(async ({ tempFilePath }) => {
+            const imageResult = await uploadImage(tempFilePath);
+            await fs.remove(tempFilePath);
+            return imageResult;
+          })
+        );
       } catch (error) {
         const { message } = error;
         return res
@@ -226,6 +271,54 @@ export const updatePost = async (req, res) => {
       });
     }
 
+    const imagesToUpload = [];
+
+    if (files && files.images) {
+      const { images } = files;
+
+      if (validateArrayField(images)) {
+        images.forEach(({ name, size, tempFilePath }) => {
+          const imageExtension = getExtension(name);
+
+          if (!isValidImageExtension(imageExtension)) {
+            errors.push({
+              error: `Invalid image type (${name}). Only JPG, JPEG, PNG, and WebP images are allowed.`,
+            });
+          }
+
+          const imageSize = getFileSizeInMB(size);
+
+          if (imageSize > MAX_IMAGE_SIZE) {
+            errors.push({
+              error: `Image size (${name}) exceeds the maximum allowed (${MAX_IMAGE_SIZE}MB).`,
+            });
+          }
+
+          imagesToUpload.push({ tempFilePath });
+        });
+      } else {
+        const { name, size, tempFilePath } = images;
+
+        const imageExtension = getExtension(name);
+
+        if (!isValidImageExtension(imageExtension)) {
+          errors.push({
+            error: `Invalid image type (${name}). Only JPG, JPEG, PNG, and WebP images are allowed.`,
+          });
+        }
+
+        const imageSize = getFileSizeInMB(size);
+
+        if (imageSize > MAX_IMAGE_SIZE) {
+          errors.push({
+            error: `Image size (${name}) exceeds the maximum allowed (${MAX_IMAGE_SIZE}MB).`,
+          });
+        }
+
+        imagesToUpload.push({ tempFilePath });
+      }
+    }
+
     if (errors.length > 0) {
       return res.status(400).json({ errors });
     }
@@ -240,25 +333,17 @@ export const updatePost = async (req, res) => {
       updateValues.content = content;
     }
 
-    if (files && files.images) {
-      try {
-        const { images } = files;
-        let imageResults;
+    let imageResults;
 
-        if (validateArrayField(images)) {
-          imageResults = await Promise.all(
-            images.map(async ({ tempFilePath }) => {
-              const imageResult = await uploadImage(tempFilePath);
-              await fs.remove(tempFilePath);
-              return imageResult;
-            })
-          );
-        } else {
-          const { tempFilePath } = images;
-          const imageResult = await uploadImage(tempFilePath);
-          await fs.remove(tempFilePath);
-          imageResults = [imageResult];
-        }
+    if (imagesToUpload.length > 0) {
+      try {
+        imageResults = await Promise.all(
+          imagesToUpload.map(async ({ tempFilePath }) => {
+            const imageResult = await uploadImage(tempFilePath);
+            await fs.remove(tempFilePath);
+            return imageResult;
+          })
+        );
 
         updateValues.images = [
           ...postToUpdate.images,
