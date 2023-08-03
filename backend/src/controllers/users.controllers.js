@@ -19,6 +19,7 @@ import {
   validateEmailFormatField,
   validateDateField,
   validateMobileNumberField,
+  validateObjectIdField,
 } from "../libs/validators.js";
 import { uploadImage, deleteImage } from "../libs/cloudinary.js";
 import {
@@ -417,6 +418,18 @@ export const followUser = async (req, res) => {
     const { _id } = user;
     const { id } = params;
 
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the User is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in User ID. Expected Object ID." });
+    }
+
     const currentUser = await User.findById(_id);
 
     if (!currentUser) {
@@ -429,7 +442,7 @@ export const followUser = async (req, res) => {
       return res.status(404).json({ message: "User to follow not found" });
     }
 
-    if (_id.toString() === id) {
+    if (_id.equals(id)) {
       return res.status(400).json({ message: "You cannot follow yourself" });
     }
 
@@ -450,7 +463,7 @@ export const followUser = async (req, res) => {
       $push: { notifications: { notification: notification._id } },
     });
 
-    res.json({ message: "Follow request sent" });
+    return res.json({ message: "Follow request sent" });
   } catch (error) {
     const { message } = error;
     return res
@@ -473,10 +486,26 @@ export const changeFollowRequestStatus = async (req, res) => {
 
     const { status } = body;
 
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the User is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in User ID. Expected Object ID." });
+    }
+
+    if (!status) {
+      return res.status(400).json({ message: "Status field is required" });
+    }
+
     const statusValues = ["pending", "accepted", "rejected"];
 
     if (!statusValues.includes(status)) {
-      return res.status(400).json({ message: "Invalid status value" });
+      return res.status(400).json({ message: "Invalid Status value" });
     }
 
     const currentUser = await User.findById(_id);
@@ -519,7 +548,7 @@ export const changeFollowRequestStatus = async (req, res) => {
       });
     }
 
-    res.json({ message: `Follow request ${status}` });
+    return res.json({ message: `Follow request ${status}` });
   } catch (error) {
     const { message } = error;
     return res
@@ -539,6 +568,18 @@ export const unfollowUser = async (req, res) => {
 
     const { _id } = user;
     const { id } = params;
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the User is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in User ID. Expected Object ID." });
+    }
 
     const currentUser = await User.findById(_id);
 
@@ -562,7 +603,7 @@ export const unfollowUser = async (req, res) => {
 
     await userToUnfollow.updateOne({ $pull: { followers: { user: _id } } });
 
-    res.json({ message: "You unfollowed this user" });
+    return res.json({ message: "You unfollowed this user" });
   } catch (error) {
     const { message } = error;
     return res
@@ -593,7 +634,7 @@ export const getFollowing = async (req, res) => {
 
     const followingCount = followingUsers.length;
 
-    res.json({ followingCount, followingUsers });
+    return res.json({ followingCount, followingUsers });
   } catch (error) {
     const { message } = error;
     return res
@@ -624,7 +665,7 @@ export const getFollowers = async (req, res) => {
 
     const followersCount = followerUsers.length;
 
-    res.json({ followersCount, followerUsers });
+    return res.json({ followersCount, followerUsers });
   } catch (error) {
     const { message } = error;
     return res
@@ -657,7 +698,7 @@ export const getNotifications = async (req, res) => {
       _id: { $in: notificationIds },
     });
 
-    res.json(notifications);
+    return res.json(notifications);
   } catch (error) {
     const { message } = error;
     return res
@@ -677,6 +718,18 @@ export const getUserProfile = async (req, res) => {
 
     const { _id } = user;
     const { id } = params;
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the User is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in User ID. Expected Object ID." });
+    }
 
     const currentUser = await User.findById(_id);
 
@@ -802,7 +855,7 @@ export const searchUsers = async (req, res) => {
       return res.json(suggestedUsers);
     }
 
-    res.json(users);
+    return res.json(users);
   } catch (error) {
     const { message } = error;
     return res
@@ -892,6 +945,7 @@ export const logout = async (req, res) => {
     }
 
     res.clearCookie("refreshToken");
+
     return res.json({ success: true });
   } catch (error) {
     const { message } = error;
