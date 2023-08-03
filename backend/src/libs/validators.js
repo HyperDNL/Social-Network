@@ -1,4 +1,5 @@
 import moment from "moment";
+import mongoose from "mongoose";
 
 export const validateStringField = (value) => {
   return typeof value === "string";
@@ -66,4 +67,8 @@ export const validateMobileNumberField = (value) => {
   const regex = /^\d{10}$/;
 
   return typeof regex.test(value);
+};
+
+export const validateObjectIdField = (value) => {
+  return mongoose.Types.ObjectId.isValid(value);
 };
