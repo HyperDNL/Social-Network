@@ -1,7 +1,11 @@
 import fs from "fs-extra";
 import User from "../models/User.js";
 import Post from "../models/Post.js";
-import { validateStringField, validateArrayField } from "../libs/validators.js";
+import {
+  validateStringField,
+  validateArrayField,
+  validateObjectIdField,
+} from "../libs/validators.js";
 import { uploadImage, deleteImage } from "../libs/cloudinary.js";
 import {
   getExtension,
@@ -138,7 +142,7 @@ export const createPost = async (req, res) => {
       $push: { posts: { post: newPost._id } },
     });
 
-    res.status(201).json(newPost);
+    return res.status(201).json(newPost);
   } catch (error) {
     const { message } = error;
     return res
@@ -169,7 +173,7 @@ export const getPosts = async (req, res) => {
       _id: { $in: postIds },
     });
 
-    res.status(200).json(posts);
+    return res.status(200).json(posts);
   } catch (error) {
     const { message } = error;
     return res
@@ -190,6 +194,18 @@ export const getPost = async (req, res) => {
     const { _id } = user;
     const { id } = params;
 
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the Post is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in Post ID. Expected Object ID." });
+    }
+
     const currentUser = await User.findById(_id);
 
     if (!currentUser) {
@@ -208,7 +224,7 @@ export const getPost = async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    res.status(200).json(post);
+    return res.status(200).json(post);
   } catch (error) {
     const { message } = error;
     return res
@@ -228,6 +244,18 @@ export const updatePost = async (req, res) => {
 
     const { _id } = user;
     const { id } = params;
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the Post is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in Post ID. Expected Object ID." });
+    }
 
     const currentUser = await User.findById(_id);
 
@@ -389,6 +417,30 @@ export const deleteImageFromPost = async (req, res) => {
     const { _id } = user;
     const { id, imageId } = params;
 
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the Post is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in Post ID. Expected Object ID." });
+    }
+
+    if (!imageId) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the Image is required" });
+    }
+
+    if (!validateObjectIdField(imageId)) {
+      return res.status(400).json({
+        message: "Invalid data type in Image ID. Expected Object ID.",
+      });
+    }
+
     const currentUser = await User.findById(_id);
 
     if (!currentUser) {
@@ -398,9 +450,7 @@ export const deleteImageFromPost = async (req, res) => {
     const userPost = currentUser.posts.find(({ post }) => post.equals(id));
 
     if (!userPost) {
-      return res
-        .status(404)
-        .json({ message: "Post not found in the User's posts" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const post = await Post.findById(id);
@@ -424,7 +474,7 @@ export const deleteImageFromPost = async (req, res) => {
 
       await post.save();
 
-      res.json({ message: "Image deleted successfully" });
+      return res.json({ message: "Image deleted successfully" });
     } catch (error) {
       const { message } = error;
       return res
@@ -451,6 +501,18 @@ export const deletePost = async (req, res) => {
     const { _id } = user;
     const { id } = params;
 
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the Post is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in Post ID. Expected Object ID." });
+    }
+
     const currentUser = await User.findById(_id);
 
     if (!currentUser) {
@@ -462,9 +524,7 @@ export const deletePost = async (req, res) => {
     );
 
     if (postIndex === -1) {
-      return res
-        .status(404)
-        .json({ message: "Post not found in the User's posts" });
+      return res.status(404).json({ message: "Post not found" });
     }
 
     const postToDelete = await Post.findByIdAndDelete(id);
@@ -489,7 +549,7 @@ export const deletePost = async (req, res) => {
       }
     }
 
-    res.sendStatus(204);
+    return res.sendStatus(204);
   } catch (error) {
     const { message } = error;
     return res
