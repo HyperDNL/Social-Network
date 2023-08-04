@@ -5,6 +5,7 @@ import {
   profile,
   updateProfile,
   followUser,
+  cancelFollowRequest,
   changeFollowRequestStatus,
   unfollowUser,
   getFollowing,
@@ -28,6 +29,8 @@ router.get("/profile", verifyUser, profile);
 router.put("/updateProfile", verifyUser, updateProfile);
 
 router.post("/follow/:id", verifyUser, followUser);
+
+router.delete("/cancel-request/:id", verifyUser, cancelFollowRequest);
 
 router.put("/follow-request/:id", verifyUser, changeFollowRequestStatus);
 
