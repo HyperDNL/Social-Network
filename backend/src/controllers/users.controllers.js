@@ -452,6 +452,28 @@ export const followUser = async (req, res) => {
         .json({ message: "You are already following this user" });
     }
 
+    if (!userToFollow.private_profile) {
+      const followerNotification = await Notification.create({
+        sender: _id,
+        receiver: id,
+        type: "follow_request",
+        status: "accepted",
+      });
+
+      await currentUser.updateOne({
+        $push: { following: { user: id } },
+      });
+
+      await userToFollow.updateOne({
+        $push: {
+          followers: { user: _id },
+          notifications: { notification: followerNotification._id },
+        },
+      });
+
+      return res.json({ message: "You are now following this User" });
+    }
+
     const notification = await Notification.create({
       sender: _id,
       receiver: id,
@@ -464,6 +486,68 @@ export const followUser = async (req, res) => {
     });
 
     return res.json({ message: "Follow request sent" });
+  } catch (error) {
+    const { message } = error;
+    return res
+      .status(500)
+      .json({ message: `Internal Server Error: ${message}` });
+  }
+};
+
+export const cancelFollowRequest = async (req, res) => {
+  try {
+    const { signedCookies = {}, user, params } = req;
+    const { refreshToken } = signedCookies;
+
+    if (!refreshToken || !user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { _id } = user;
+    const { id } = params;
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "The ID parameter of the User is required" });
+    }
+
+    if (!validateObjectIdField(id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data type in User ID. Expected Object ID." });
+    }
+
+    const currentUser = await User.findById(_id);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userToCancel = await User.findById(id);
+
+    if (!userToCancel) {
+      return res
+        .status(404)
+        .json({ message: "User to cancel the request not found" });
+    }
+
+    const followRequest = await Notification.findOneAndDelete({
+      sender: _id,
+      receiver: id,
+      type: "follow_request",
+      status: "pending",
+    });
+
+    if (!followRequest) {
+      return res.status(404).json({ message: "Follow request not found" });
+    }
+
+    await userToCancel.updateOne({
+      $pull: { notifications: { notification: followRequest._id } },
+    });
+
+    return res.json({ message: "Follow request canceled" });
   } catch (error) {
     const { message } = error;
     return res
@@ -525,8 +609,7 @@ export const changeFollowRequestStatus = async (req, res) => {
       return res.status(404).json({ message: "Follow request not found" });
     }
 
-    followRequest.status = status;
-    await followRequest.save();
+    await followRequest.updateOne({ status });
 
     if (status === "accepted") {
       const acceptedNotification = await Notification.create({
@@ -535,16 +618,15 @@ export const changeFollowRequestStatus = async (req, res) => {
         type: "accepted_request",
       });
 
-      await User.findByIdAndUpdate(followRequest.sender, {
-        $push: { notifications: { notification: acceptedNotification._id } },
-      });
-
       await currentUser.updateOne({
         $push: { followers: { user: followRequest.sender } },
       });
 
       await User.findByIdAndUpdate(followRequest.sender, {
-        $push: { following: { user: _id } },
+        $push: {
+          following: { user: _id },
+          notifications: { notification: acceptedNotification._id },
+        },
       });
     }
 
